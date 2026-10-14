@@ -1,5 +1,22 @@
-# Disable autocrlf on generated files, they always generate with LF
-# Add any extra files or paths here to make git stop saying they
-# are changed when only line endings change.
+# 仓库内统一使用 LF，避免 Windows / Linux 之间反复产生无意义的整文件 diff。
+* text=auto eol=lf
+
+# Windows 批处理必须保留 CRLF，否则部分环境下无法执行。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# gradlew 是给 Unix shell 用的，必须是 LF。
+gradlew text eol=lf
+
+# 二进制文件，禁止任何换行转换。
+*.jar   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ogg   binary
+*.zip   binary
+
+# Forge MDK：生成物本来就固定用 LF。
 src/generated/**/.cache/cache text eol=lf
 src/generated/**/*.json text eol=lf
