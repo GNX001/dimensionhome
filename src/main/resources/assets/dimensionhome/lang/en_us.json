@@ -1,0 +1,7 @@
+{
+  "message.dimensionhome.entered_sky": "Arrived at Dimension Home: Sky Island",
+  "message.dimensionhome.left_sky": "Returned to your original world",
+  "message.dimensionhome.sky_missing": "Dimension Home: sky dimension not loaded, cannot teleport (check the data pack)",
+  "message.dimensionhome.zone_hint": "Tip: you can never get stranded on the sky island. Within 12 blocks of the landing platform, build any smooth stone frame and light it with flint and steel (only one portal may exist at a time).",
+  "dimension.dimensionhome.sky_dimension": "Dimension Home: Sky Island"
+}

@@ -1,0 +1,10 @@
+{
+  "type": "dimensionhome:sky_type",
+  "generator": {
+    "type": "dimensionhome:void_generator",
+    "biome_source": {
+      "type": "minecraft:multi_noise",
+      "preset": "minecraft:overworld"
+    }
+  }
+}

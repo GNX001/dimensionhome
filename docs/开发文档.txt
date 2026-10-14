@@ -1,0 +1,264 @@
+# 游戏 我的世界 MOD《维度之家》开发文档（Forge 详细版 v1.3）
+
+## 变更记录
+
+| 版本 | 变更内容 |
+|---|---|
+| v1.0 | 初始版本，泥土块传送门 |
+| v1.1 | 传送门框架方块由泥土块改为平滑石方块 |
+| v1.2 | 唯一固定传送点采用下界式坐标缩放处理（`coordinateScale = 8.0`），并配合事件拦截强制固定坐标 |
+| **v1.3** | **MOD 名称统一为《维度之家 / DimensionHome》，MOD ID 定为 `dimensionhome`** |
+
+## 1. 项目概述
+
+**MOD 名称**：维度之家 / DimensionHome  
+**MOD ID**：`dimensionhome`  
+**加载器**：Forge 1.20.1
+
+核心特性：
+
+- **维度规则**：大部分与主世界一致（光照、重力、天空、生物生成）。
+- **地形**：只有浮空岛屿，没有大陆。
+- **传送门**：与地狱门机制一致，框架方块为**平滑石方块**，用打火石激活。
+- **唯一固定传送点**：空岛维度内只有一个传送门，坐标固定（如 `(0, 100, 0)`）。主世界任意平滑石门进入后都传送到此。
+- **坐标缩放**：空岛维度采用与下界一致的 `coordinateScale = 8.0`，获得下界式坐标缩放属性。
+- **返回逻辑（方案 A）**：记录玩家来源主世界门坐标，返回时回到原入口。
+
+## 2. 技术选型
+
+| 模块 | 技术方案 | 说明 |
+|---|---|---|
+| 加载器 | **Forge 1.20.1** | 使用 Forge 官方 API 和 DeferredRegister |
+| 维度注册 | `DeferredRegister<DimensionType>` + `LevelStem` | Forge 标准维度注册方式 |
+| 地形生成 | 自定义 `ChunkGenerator` | 只生成浮空岛，参考 Sky Island Generator 思路 |
+| 传送门 | **Custom Portal API Reforged** | Forge 移植版，支持自定义框架方块、激活物品、目的地 |
+| 玩家数据持久化 | **Forge Capability** | 存储玩家来源主世界门坐标 |
+| 传送拦截 | `EntityTravelToDimensionEvent` | 拦截并修改玩家传送目的地 |
+| 事件总线 | `MinecraftForge.EVENT_BUS` | 监听玩家维度切换、实体传送等事件 |
+
+## 3. 依赖配置
+
+### 3.1 build.gradle 关键依赖
+
+```gradle
+repositories {
+    maven {
+        name = "AzureDoom Mods"
+        url = "https://maven.azuredoom.com/mods"
+    }
+}
+
+dependencies {
+    implementation fg.deobf('net.kyrptonaught.customportalapi:customportalapi-reforged:1.0.2')
+}
+```
+
+### 3.2 MOD 主类
+
+```java
+@Mod(DimensionHome.MOD_ID)
+public class DimensionHome {
+    public static final String MOD_ID = "dimensionhome";
+    // ...
+}
+```
+
+## 4. 核心实现
+
+### 4.1 注册自定义维度（含坐标缩放）
+
+**创建 `ModDimensions` 类**，使用 `bootstrap` 方法注册维度类型：
+
+```java
+public class ModDimensions {
+    public static final ResourceKey<LevelStem> SKY_KEY =
+        ResourceKey.create(Registries.LEVEL_STEM,
+            ResourceLocation.fromNamespaceAndPath(DimensionHome.MOD_ID, "sky_dimension"));
+
+    public static final ResourceKey<Level> SKY_LEVEL_KEY =
+        ResourceKey.create(Registries.DIMENSION,
+            ResourceLocation.fromNamespaceAndPath(DimensionHome.MOD_ID, "sky_dimension"));
+
+    public static final ResourceKey<DimensionType> SKY_DIM_TYPE_KEY =
+        ResourceKey.create(Registries.DIMENSION_TYPE,
+            ResourceLocation.fromNamespaceAndPath(DimensionHome.MOD_ID, "sky_type"));
+
+    public static void bootstrap(BootstapContext<DimensionType> context) {
+        context.register(SKY_DIM_TYPE_KEY, new DimensionType(
+            OptionalLong.of(12000),   // 固定时间
+            true,                      // 有天空光照
+            false,                     // 无天花板
+            false,                     // 非极热维度
+            true,                      // 自然维度
+            8.0,                       // 坐标缩放：与下界一致
+            true,                      // 床可用
+            false,                     // 重生锚不可用
+            0,                         // 最小 Y
+            256,                       // 高度
+            256,                       // 逻辑高度
+            BlockTags.INFINIBURN_OVERWORLD,
+            BuiltinDimensionTypes.OVERWORLD_EFFECTS,
+            1.0f,
+            new DimensionType.MonsterSettings(false, false, ConstantInt.of(0), 0)
+        ));
+    }
+}
+```
+
+**关键参数说明**：
+- `coordinateScale = 8.0`：使空岛维度获得与下界相同的坐标缩放比例（主世界 8 格 = 空岛 1 格）。
+- 其余参数对齐主世界：`hasSkyLight = true`、`hasCeiling = false`、`ultrawarm = false`、`natural = true`、`bedWorks = true`。
+
+### 4.2 空岛地形生成
+
+**创建自定义 `ChunkGenerator`**，只生成浮空岛屿：
+
+```java
+public class SkyIslandChunkGenerator extends ChunkGenerator {
+    @Override
+    public CompletableFuture<ChunkAccess> fillFromNoise(
+            Executor executor, Blender blender, RandomState random,
+            StructureManager structureManager, ChunkAccess chunk) {
+        // 使用 Perlin 噪声在 Y=100 附近生成浮岛
+        return CompletableFuture.completedFuture(chunk);
+    }
+}
+```
+
+**关键点**：
+- 地形在 Y 轴中间高度（如 Y=80~120）生成浮空岛屿。
+- 生物群系、矿物、结构可复用主世界配置，仅替换地形形状。
+- 出生点必须设置安全平台（3×3 或 5×5 方块），防止玩家坠落虚空。
+- 可参考 **Sky Island Generator**（Forge 1.20.1 模组）的实现。
+
+### 4.3 平滑石传送门
+
+在 MOD 初始化器中注册传送门：
+
+```java
+CustomPortalBuilder.beginPortal()
+    .frameBlock(Blocks.SMOOTH_STONE)      // 框架方块：平滑石方块
+    .lightWithItem(Items.FLINT_AND_STEEL) // 激活方式：打火石
+    .destDimID(ResourceLocation.fromNamespaceAndPath(DimensionHome.MOD_ID, "sky_dimension"))
+    .tintColor(160, 160, 160)             // 可选：平滑石灰白色传送门颜色
+    .registerPortal();
+```
+
+**效果**：玩家用平滑石方块搭建 4×5 框架，用打火石点燃，生成传送门方块，进入后到达空岛维度。传送门运作逻辑与原版地狱门一致。
+
+**注意**：平滑石方块 ID 为 `minecraft:smooth_stone`，不是台阶或其它变种。
+
+### 4.4 唯一固定传送点（下界式坐标缩放 + 强制固定坐标）
+
+**目标**：空岛维度内只有一个传送门，坐标固定为 `(0, 100, 0)`。主世界任何平滑石门进入后都传送到此。同时，维度层面采用下界式坐标缩放（`coordinateScale = 8.0`）。
+
+#### 4.4.1 玩家来源坐标持久化（Capability）
+
+创建一个 **Player Capability** 来存储玩家来源主世界门坐标：
+
+```java
+public class PortalOriginCapability implements ICapabilitySerializable<CompoundTag> {
+    private BlockPos originPos = BlockPos.ZERO;
+    private ResourceKey<Level> originDim = Level.OVERWORLD;
+
+    public BlockPos getOriginPos() { return originPos; }
+    public void setOriginPos(BlockPos pos) { this.originPos = pos; }
+    // ... NBT 序列化/反序列化方法
+}
+```
+
+**注册 Capability** 并附加到玩家实体上。死亡时需在 `PlayerEvent.Clone` 中手动复制数据。
+
+#### 4.4.2 拦截传送目的地并强制固定坐标
+
+使用 `EntityTravelToDimensionEvent` 拦截玩家进入空岛维度的传送：
+
+```java
+@SubscribeEvent
+public void onEntityTravelToDimension(EntityTravelToDimensionEvent event) {
+    if (event.getEntity() instanceof ServerPlayer player) {
+        ResourceKey<Level> targetDim = event.getDimension();
+
+        if (targetDim.equals(ModDimensions.SKY_LEVEL_KEY)) {
+            // 记录玩家来源主世界门坐标
+            BlockPos originPos = player.blockPosition();
+            player.getCapability(PortalOriginCapability.PORTAL_ORIGIN)
+                .ifPresent(cap -> cap.setOriginPos(originPos));
+
+            // 取消默认传送（默认会按 coordinateScale=8.0 计算目标位置）
+            event.setCanceled(true);
+
+            // 强制传送到唯一固定坐标
+            ServerLevel skyLevel = player.server.getLevel(ModDimensions.SKY_LEVEL_KEY);
+            BlockPos fixedPos = new BlockPos(0, 100, 0);
+
+            player.teleportTo(skyLevel,
+                fixedPos.getX() + 0.5,
+                fixedPos.getY(),
+                fixedPos.getZ() + 0.5,
+                player.getYRot(), player.getXRot());
+        }
+    }
+}
+```
+
+**关键点**：
+- `coordinateScale = 8.0` 已在维度类型中生效，但通过 `event.setCanceled(true)` 阻止默认传送，再手动 `teleportTo` 到固定坐标。
+- 这样既保留了维度层面的下界式缩放属性，又实现了唯一固定传送点。
+
+#### 4.4.3 返回主世界逻辑（方案 A）
+
+当玩家从空岛维度返回主世界时，读取 Capability 中记录的来源坐标，将玩家传送回原入口：
+
+```java
+@SubscribeEvent
+public void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+    if (event.getFrom().equals(ModDimensions.SKY_LEVEL_KEY)
+            && event.getTo().equals(Level.OVERWORLD)) {
+
+        ServerPlayer player = (ServerPlayer) event.getEntity();
+        player.getCapability(PortalOriginCapability.PORTAL_ORIGIN).ifPresent(cap -> {
+            BlockPos origin = cap.getOriginPos();
+            ServerLevel overworld = player.server.getLevel(Level.OVERWORLD);
+
+            // 传送到原入口附近
+            player.teleportTo(overworld,
+                origin.getX() + 0.5,
+                origin.getY() + 1,
+                origin.getZ() + 0.5,
+                player.getYRot(), player.getXRot());
+        });
+    }
+}
+```
+
+**注意**：`PlayerChangedDimensionEvent` 不可取消，因此需要在返回后立即修正玩家位置。
+
+#### 4.4.4 禁止空岛维度内生成新传送门
+
+为确保唯一性，需要在空岛维度内禁止激活新的平滑石门。可以通过监听方块放置或传送门激活事件，检测维度是否为 `SKY_LEVEL_KEY`，若是则阻止激活。
+
+## 5. 开发步骤
+
+1. **搭建 Forge MOD 工程**（IntelliJ IDEA + Forge MDK 1.20.1），MOD ID 设为 `dimensionhome`。
+2. **注册维度类型与空岛维度**（`ModDimensions` 类，设置 `coordinateScale = 8.0`）。
+3. **实现空岛 `ChunkGenerator`**，生成浮空岛屿和出生点安全平台。
+4. **集成 Custom Portal API Reforged**，注册**平滑石**传送门。
+5. **创建 Player Capability**，存储来源主世界门坐标。
+6. **实现 `EntityTravelToDimensionEvent` 监听器**，拦截并强制传送到固定坐标。
+7. **实现 `PlayerChangedDimensionEvent` 监听器**，处理返回主世界逻辑。
+8. **禁止空岛维度内激活新传送门**。
+9. **测试**：主世界多地传送 → 固定点到达 → 返回原入口 → 地形安全 → 坐标缩放属性生效。
+10. **打包发布**。
+
+## 6. 注意事项
+
+- **Capability 死亡持久化**：默认 Capability 数据不会在死亡时持久化，需要在 `PlayerEvent.Clone` 中手动复制。
+- **维度卸载**：玩家跨维度传送时实体对象会被克隆，Capability 数据需要通过 NBT 序列化自动保存。
+- **固定传送点安全平台**：坐标 `(0, 100, 0)` 周围必须预先放置安全方块，防止玩家传送后坠落虚空。
+- **禁止新传送门生成**：空岛维度内若玩家搭建平滑石门并激活，必须拦截，否则会违反“唯一传送点”限制。
+- **Forge 版本一致性**：Custom Portal API Reforged 需匹配目标 Forge 版本（1.20.1 对应 `customportalapi-reforged:1.0.2`）。
+- **返回坐标偏移**：返回主世界时，建议将玩家传送到来源坐标的 `Y+1` 位置，避免卡在方块内。
+- **平滑石方块 ID**：确保使用 `Blocks.SMOOTH_STONE`（`minecraft:smooth_stone`），而非台阶或其它变种。
+- **坐标缩放与事件拦截的配合**：`coordinateScale = 8.0` 在维度层面生效，但实际传送目标由 `EntityTravelToDimensionEvent` 覆盖。若移除事件拦截，玩家将按 8:1 比例出现在空岛维度对应位置，而非固定点。
+

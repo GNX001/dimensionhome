@@ -1,0 +1,39 @@
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+
+# Files from Forge MDK
+forge*changelog.txt
+
+# vscode
+.vscode
+*.code-workspace
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# crash / debug logs
+hs_err_pid*.log
+replay_pid*.log
+*.hprof

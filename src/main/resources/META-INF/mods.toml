@@ -1,0 +1,40 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="${mod_authors}"
+description='''
+【必需前置 MOD】Custom Portal API Reforged 1.0.2（MOD ID：cpapireforged）
+缺少它游戏会直接崩溃、无法启动。请把 customportalapi-reforged-1.0.2.jar 与本 MOD 一起放进 mods 文件夹。
+
+Required dependency: Custom Portal API Reforged 1.0.2 (mod id: cpapireforged).
+The game will fail to start without it.
+
+用平滑石搭门、打火石点燃，进入一片纯虚空的「维度之家」空岛，并按原路返回原来的维度与原来的门。
+A void "Dimension Home" reached through smooth-stone portals, with one fixed arrival platform and a recorded return trip.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="cpapireforged"
+    mandatory=true
+    versionRange="[1.0.2,)"
+    ordering="AFTER"
+    side="BOTH"

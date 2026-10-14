@@ -1,0 +1,7 @@
+{
+  "message.dimensionhome.entered_sky": "已抵达维度之家：空岛",
+  "message.dimensionhome.left_sky": "已返回原来的世界",
+  "message.dimensionhome.sky_missing": "维度之家：空岛维度未加载，无法传送（请检查数据包）",
+  "message.dimensionhome.zone_hint": "提示：空岛上的传送门即使被拆掉也不会被困 —— 只要在落脚平台周围 12 格范围内，用平滑石搭好任意形状的门框，再用打火石点燃即可（同一时间只允许存在一扇门）。",
+  "dimension.dimensionhome.sky_dimension": "维度之家：空岛"
+}
