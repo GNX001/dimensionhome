@@ -4,7 +4,7 @@
 > 用**平滑石**搭一扇门、打火石点燃，就能进入纯虚空的空岛；
 > 再走回来时，你会回到**出发的那个维度、原来那扇门**旁边。
 
-**English: [README_en.txt](README_en.txt)**
+**English: [README_en.md](README_en.md)**
 
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-62B47A?style=flat-square)](https://www.minecraft.net/)
 [![Forge](https://img.shields.io/badge/Forge-47.x-DFA037?style=flat-square)](https://files.minecraftforge.net/)
@@ -140,7 +140,7 @@ gradlew.bat runServer    :: 启动带 MOD 的服务器
 ```
 dimensionhome/
 ├─ README.md                        中文说明（本文件）
-├─ README_en.txt                    英文说明（纯文本）
+├─ README_en.md                     英文说明
 ├─ LICENSE                          MIT
 ├─ publish.ps1                      提交并推送的辅助脚本
 ├─ src/main/java/com/dimensionhome/
